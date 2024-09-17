@@ -1,0 +1,44 @@
+# DEV dependencies
+# ----------------
+# This file list additional dependencies that are needed in a dev environment.
+# The dev dependencies are not needed to run the app.
+# There are only useful to perform extra actions such as formatting, linting, and testing.
+# Any dependency listed here will not be installed in production.
+# Installing this file will also install all default requirements available in: requirements.txt
+#
+# To install, run:
+# pip install -r requirements-dev.txt
+#
+# To list outdated packages, run:
+# pip list --outdated
+
+# Default requirements
+-r requirements.txt
+
+# Formatting
+black~=23.12
+isort~=5.13
+rich~=13.7
+
+# Linting
+pylint~=3.0
+mypy~=1.7
+pydocstyle~=6.3
+
+# Linting: Stubs
+types-PyYAML~=6.0
+celery-types~=0.18
+types-passlib~=1.7
+types-xmltodict~=0.13
+types-requests~=2.31
+motor-stubs~=1.7
+types-oauthlib~=3.2
+types-redis~=4.6
+
+# Testing
+pytest~=7.4
+pytest-asyncio~=0.21.0
+coverage~=7.3
+pytest-cov~=4.1
+async-asgi-testclient~=1.4
+pytest-celery~=0.0
