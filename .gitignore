@@ -61,7 +61,6 @@ tmp
 _local
 .vscode
 .idea
-.deta
 
 db.sqlite3
 *.log

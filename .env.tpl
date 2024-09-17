@@ -11,3 +11,7 @@ APP_SETTINGS_MONGO__HOST="xxxxxxxxxxxxx"
 APP_SETTINGS_MONGO__DB="xxxxxxxxxxx"
 APP_SETTINGS_MONGO__USERNAME="xxxxxxxxxxxxx"
 APP_SETTINGS_MONGO__PASSWORD="xxxxxxxxxxxxxxxx"
+
+# AWS
+
+# Kafka
