@@ -51,24 +51,8 @@ cp ./.env.tpl ./.env
 Open `.env` file with a text editor and update the env vars as needed
 
 
-6. Load metadata, from metadata.yml:
-```shell
-python register.py
-```
-
-1. Run migrations:
-```shell
-python migrate.py
-```
-
 ## ⏯ Running
 
-To run the app on your machine, make sure to have activated your virtualenv and run:
-```shell
-python main.py
-```
-
-- Visit: http://127.0.0.1:8000/ to view the application running in your browser
 
 
 ## 🖌 Formatting

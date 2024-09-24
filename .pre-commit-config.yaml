@@ -47,7 +47,7 @@ repos:
       - id: pytest-check
         args: []
         name: pytest-check
-        entry: scripts/pre-commit-pytest.sh
+        entry: pre-commit-pytest.sh
         language: script
         pass_filenames: false
         always_run: true
