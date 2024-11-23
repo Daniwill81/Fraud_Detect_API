@@ -43,6 +43,20 @@ pandas==2.1.4
 numpy==1.26.2
 scikit-learn==1.5.2
 matplotlib==3.9.2
+tqdm==4.66.5
+
+# Ajouter les dépendances CUDA
+nvidia-cudnn-cu11==8.6.0.163  # cuDNN pour CUDA 11
+nvidia-cuda-runtime-cu11==11.8.89  # Runtime CUDA
+nvidia-cuda-cupti-cu11==11.8.87  # CUDA Profiling Tools Interface
+nvidia-cuda-nvrtc-cu11==11.8.89  # CUDA Runtime Compilation
+nvidia-cublas-cu11==11.11.3.6  # CUDA Basic Linear Algebra Subroutines
+nvidia-cufft-cu11==10.9.0.58  # CUDA Fast Fourier Transform
+nvidia-curand-cu11==10.3.0.86  # CUDA Random Number Generation
+nvidia-cusolver-cu11==11.4.1.48  # CUDA Solver
+nvidia-cusparse-cu11==11.7.5.86  # CUDA Sparse Matrix
+nvidia-nccl-cu11==2.14.3  # NVIDIA Collective Communications Library
+nvidia-tensorrt==99.0.0  # TensorRT (optionnel)
 
 # Homomorphic Encryption
 py-seal==0.6.3
