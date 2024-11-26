@@ -42,3 +42,7 @@ coverage~=7.3
 pytest-cov~=4.1
 async-asgi-testclient~=1.4
 pytest-celery~=0.0
+
+# CI/CD
+pre-commit~=3.6
+PyYAML~=6.0
