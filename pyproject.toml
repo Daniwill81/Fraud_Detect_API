@@ -114,6 +114,7 @@ module = [
     "openapi_client",
     "motor.motor_asyncio",
     "sendgrid.helpers.mail",
+    "aioboto3",
 ]
 ignore_missing_imports = true
 implicit_reexport = true
