@@ -1,4 +1,9 @@
-# Fraud detection Project
+[![Release 0.0.1](https://github.com/trellixio/proj-ehadj-api)]
+[![Python 3.12](https://img.shields.io/badge/python-3.12-yellow.svg)](https://www.python.org/downloads/release/python-312/)
+[![MongoDB 7.0](https://img.shields.io/badge/mongodb-7.0-green.svg)](https://www.mongodb.com/docs/v7.0/)
+
+
+# efraud dectect Project
 
 
 This is the app project template structure using FastAPI.
@@ -12,7 +17,7 @@ This template is based on the following technologies:
 
 ## 🔨 Installing
 
-### Python 3.12
+### Python 3.9
 Before getting started, ensure that [Python 3.12](https://www.python.org/) is installed on your computer.
 
 ### MongoDB
@@ -24,9 +29,16 @@ Once you install MongoDB, make sure to create a database.
 ### Steps
 Clone the repo and open a terminal at the root of the cloned repo.
 
+Before getting started, make sure you have installed virtualenv on your device:
+
+Install virtualenv
+```shell
+sudo apt install python3-virtualenv
+```
+
 1. Setup a virtual env. Only do this on your first run.
 ```shell
-virtualenv .venv --python=python3.12
+python3.12 -m venv .venv
 ```
 
 2. Activate the virtualenv
@@ -51,8 +63,24 @@ cp ./.env.tpl ./.env
 Open `.env` file with a text editor and update the env vars as needed
 
 
+6. Load metadata, from metadata.yml:
+```shell
+python register.py
+```
+
+1. Run migrations:
+```shell
+python migrate.py
+```
+
 ## ⏯ Running
 
+To run the app on your machine, make sure to have activated your virtualenv and run:
+```shell
+python main.py
+```
+
+- Visit: http://127.0.0.1:8000/ to view the application running in your browser
 
 
 ## 🖌 Formatting
@@ -96,7 +124,7 @@ From the project root, run:
 mypy .
 ```
 
-- Use mypy to check for documentation issues.
+- Use pydocstyle to check for documentation issues.
 From the project root, run:
 ```shell
 pydocstyle .
@@ -109,4 +137,9 @@ Tests are run using the pytest library.
 From the project root, run:
 ```shell
 pytest
+```
+
+To test a specific testcase:
+```shell
+pytest -sv path_to_test_file::test_name
 ```

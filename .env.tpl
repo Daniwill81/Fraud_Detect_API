@@ -13,5 +13,3 @@ APP_SETTINGS_MONGO__USERNAME="xxxxxxxxxxxxx"
 APP_SETTINGS_MONGO__PASSWORD="xxxxxxxxxxxxxxxx"
 
 # AWS
-
-# Kafka

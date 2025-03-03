@@ -12,6 +12,7 @@ It just needs to reference the app object
 from pprint import pprint
 
 import uvicorn
+
 from AppMain.asgi import app
 from AppMain.settings import AppSettings
 

@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v4.6.0
     hooks:
       - id: check-added-large-files
       - id: check-yaml
@@ -13,13 +13,13 @@ repos:
       - id: no-commit-to-branch
         args: [--branch, release, --branch, staging, --branch, main]
   - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+    rev: 5.13.2
     hooks:
       - id: isort
         name: isort-check
         args: [--check]
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 24.10.0
     hooks:
       - id: black
         name: black-check
@@ -40,14 +40,14 @@ repos:
         language: system
       - id: pylint-check
         args: []
-        name: pylint-checko
+        name: pylint-check
         entry: pylint
         types: [python]
         language: system
       - id: pytest-check
         args: []
         name: pytest-check
-        entry: pre-commit-pytest.sh
+        entry: scripts/pre-commit-pytest.sh
         language: script
         pass_filenames: false
         always_run: true
