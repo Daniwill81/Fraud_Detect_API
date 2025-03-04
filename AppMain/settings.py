@@ -23,6 +23,7 @@ import os
 import pathlib
 import typing
 
+import aioboto3
 import pydantic_settings
 from pydantic import Field
 
@@ -49,21 +50,29 @@ class _Settings(pydantic_settings.BaseSettings):
         env_nested_delimiter="__",
     )
 
-    PROJ_NAME: str = "sfd-api"
+    PROJ_NAME: str = "eFraude-detection"
 
     # Envs
     APP_ENV: str = os.getenv("APP_ENV", "DEV")
     LOG_DIR: str = "/tmp/"
     APP_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent
-    FRONTEND_URL: str = "http://localhost:8000/"
+    FRONTEND_URL: str = ""
 
     # Databases
     MONGO: DatabaseParams = Field(default_factory=DatabaseParams)
 
-    # Email
+    # Files Storage
+    AWS_ENDPOINT: str
+    AWS_ACCESS_KEY_ID: str
+    AWS_ACCESS_KEY_SECRET: str
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_BUCKET: str = "ehadj"
+    AWS_USE_SSL: bool = True
 
-    # Other
-    TEST_ENV: str = os.getenv("TEST_ENV", "NONE")
+    @property
+    def is_prod(self) -> bool:
+        """Return True if production environment."""
+        return self.APP_ENV == "PROD"
 
     @property
     def is_dev(self) -> bool:
@@ -145,3 +154,9 @@ logger_access = logging.getLogger("access")
 # ###################################
 # #     Logging       ###############
 # ###################################
+
+boto3_session = aioboto3.Session(
+    aws_access_key_id=AppSettings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AppSettings.AWS_ACCESS_KEY_SECRET,
+    region_name=AppSettings.AWS_REGION,
+)
