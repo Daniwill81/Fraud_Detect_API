@@ -65,9 +65,12 @@ class _Settings(pydantic_settings.BaseSettings):
     AWS_ENDPOINT: str
     AWS_ACCESS_KEY_ID: str
     AWS_ACCESS_KEY_SECRET: str
-    AWS_REGION: str = "us-east-1"
-    AWS_S3_BUCKET: str = "ehadj"
+    AWS_REGION: str = "eu-north-1"
+    AWS_S3_BUCKET: str = "e-fraud-demo-bucket-1"
     AWS_USE_SSL: bool = True
+
+    # Get conuntry from IP
+    IP_INFO_URL: str
 
     @property
     def is_prod(self) -> bool:

@@ -20,7 +20,7 @@ s3 = boto3.client(
 )
 
 
-async def s3_upload(contents: bytes, key: str, bucket: str = AppSettings.AWS_S3_BUCKET) -> str | None:
+async def s3_upload(contents: bytes, key: str, bucket: str) -> str | None:
     """Upload a file to AWS S3."""
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=contents)

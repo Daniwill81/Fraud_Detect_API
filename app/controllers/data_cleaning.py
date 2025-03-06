@@ -1,6 +1,6 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split # type: ignore
+from sklearn.preprocessing import StandardScaler # type: ignore
 
 from app.xlib.s3 import s3_upload
 from AppMain.settings import AppSettings
@@ -50,9 +50,9 @@ async def prepare_and_upload_data(csv_file_path: str) -> dict[str, str]:
     validation_key = f"{project_name}/val_set.csv"
     test_key = f"{project_name}/test_set.csv"
 
-    train_url = await s3_upload(train_csv.encode(), train_key)
-    val_url = await s3_upload(val_csv.encode(), validation_key)
-    test_url = await s3_upload(test_csv.encode(), test_key)
+    train_url = await s3_upload(train_csv.encode(), train_key, AppSettings.AWS_S3_BUCKET)
+    val_url = await s3_upload(val_csv.encode(), validation_key, AppSettings.AWS_S3_BUCKET)
+    test_url = await s3_upload(test_csv.encode(), test_key, AppSettings.AWS_S3_BUCKET)
 
     return {
         "project_name": project_name,

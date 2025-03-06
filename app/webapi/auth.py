@@ -33,9 +33,7 @@ async def create(request: Request, serializer_write: LoginAuthSerializer) -> Aut
     assert (user := serializer_write.instance)
     await user.generate_auth_key()
     assert user.auth_key
-    return AuthTokenSerializer(
-        id=user.auth_key, auth_key=user.auth_key, email=user.email, user=UserSerializer.read(user)
-    )
+    return AuthTokenSerializer(id=user.auth_key, auth_key=user.auth_key, user=UserSerializer.read(user))
 
 
 @router.post("/reset_password/", status_code=status.HTTP_202_ACCEPTED)
@@ -49,17 +47,15 @@ async def reset_password(request: Request, serializer_write: ResetPasswordSerial
     user = await serializer_write.update()
     await user.generate_auth_key()
     assert user.auth_key
-    return AuthTokenSerializer(
-        id=user.auth_key, auth_key=user.auth_key, email=user.email, user=UserSerializer.read(user)
-    )
+    return AuthTokenSerializer(id=user.auth_key, auth_key=user.auth_key, user=UserSerializer.read(user))
 
 
 @router.post("/forgot_password/", status_code=status.HTTP_202_ACCEPTED)
-async def forgot_password(request: Request, serializer_write: ForgotPasswordSerializer) -> dict[str, bool]:
+async def forgot_password(request: Request, serializer_write: ForgotPasswordSerializer) -> dict[str, str]:
     """Let the user request for a link to reset their password."""
     await serializer_write.run_async_validators(request=request)
-    await serializer_write.update()
-    return {"result": True}
+    user = await serializer_write.update()
+    return {"email": user.email}
 
 
 @router.delete("/{pk}/", status_code=status.HTTP_204_NO_CONTENT)

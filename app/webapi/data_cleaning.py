@@ -12,19 +12,21 @@ The API is structured with  Representational state transfer architecture:
 https://en.wikipedia.org/wiki/Representational_state_transfer
 """
 
-import controllers
-import controllers.data_cleaning
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from app.controllers import data_cleaning
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
+from app.models import User
+from app.models.enums import RoleEnum
+from app.models.user.auth import user_auth
 from AppMain.settings import AppSettings
 
 router = APIRouter()
 
 
-@router.post("/prepare-and-upload-data/")
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def prepare_and_upload_data_endpoint(
     csv_file: UploadFile = File(...),
-    request_user: User = Depends(user_auth.require([RoleEnum.SA1])),
+    request_user: User = Depends(user_auth.require([RoleEnum.INST])),
 ) -> dict[str, str]:
     """
     Endpoint pour préparer les données et les téléverser sur S3.
@@ -49,7 +51,7 @@ async def prepare_and_upload_data_endpoint(
 
     try:
         # Préparer les données et les téléverser sur S3
-        result = await controllers.data_cleaning.prepare_and_upload_data(temp_file_path)
+        result = await data_cleaning.prepare_and_upload_data(temp_file_path)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la préparation des données : {str(e)}")

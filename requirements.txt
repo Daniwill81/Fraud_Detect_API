@@ -39,10 +39,12 @@ supervisor==4.2.5
 
 # Data treatment
 pandas==2.1.4
+pandas-stubs==2.2.3.241126
 numpy==1.26.2
 scikit-learn==1.5.2
 matplotlib==3.9.2
 seaborn==0.13.2
+types-seaborn==0.13.2.20250111
 
 # Homomorphic Encryption
 py-seal==0.6.3
