@@ -14,9 +14,9 @@ https://en.wikipedia.org/wiki/Representational_state_transfer
 
 import logging
 
-from app.controllers import eda
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
+from app.controllers import eda
 from app.models import User
 from app.models.enums import RoleEnum
 from app.models.user.auth import user_auth
@@ -36,12 +36,21 @@ async def perform_eda_endpoint(
 ) -> dict[str, str]:
     try:
         contents = await csv_file.read()
-        return eda.perform_eda(contents, batch_size=batch_size, skip_ip_check=skip_ip_check)
-    except HTTPException as e:
-        # Les exceptions FastAPI générées par perform_eda sont simplement propagées
-        raise e
     except Exception as e:
-        logger.error(f"Erreur inattendue: {str(e)}")
+        logger.error("Erreur lors de la lecture du fichier: %s", str(e))
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erreur inattendue lors du traitement: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de la lecture du fichier",
+        ) from e
+
+    try:
+        return eda.perform_eda(contents, batch_size=batch_size, skip_ip_check=skip_ip_check)
+    except HTTPException:
+        # Les exceptions FastAPI générées par perform_eda sont simplement propagées
+        raise
+    except Exception as e:
+        logger.error("Erreur inattendue: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur inattendue lors du traitement: {str(e)}",
+        ) from e

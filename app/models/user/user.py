@@ -38,8 +38,8 @@ class User(PasswordMixin, Document):
         """Format user name."""
         return f"l'utilisateur {self.first_name} {self.last_name.upper()}"
 
-    def verify_password(self, plain_password: str) -> bool:
-        return pwd_context.verify(plain_password, self.hashed_password)
+    def verify_password(self, password: str) -> bool:
+        return pwd_context.verify(password, self.hashed_password)
 
     def set_password(self, password: str) -> None:
         self.hashed_password = pwd_context.hash(password)

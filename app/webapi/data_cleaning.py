@@ -1,20 +1,22 @@
 """
 # WebAPI.
 
-The API endpoint  is queried by other applications
+The API endpoint is queried by other applications
 to communicate with this application. This endpoint usually relies
-on a header based authenticated encoded in the request headers.
+on a header-based authentication encoded in the request headers.
 Commonly Basic or Bearer Auth.
 
-It should accept and returns data formatted in JSON.
+It should accept and return data formatted in JSON.
 
-The API is structured with  Representational state transfer architecture:
+The API is structured with Representational State Transfer architecture:
 https://en.wikipedia.org/wiki/Representational_state_transfer
 """
 
-from app.controllers import data_cleaning
+import os  # Importation déplacée en haut du fichier
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
+from app.controllers import data_cleaning
 from app.models import User
 from app.models.enums import RoleEnum
 from app.models.user.auth import user_auth
@@ -32,31 +34,40 @@ async def prepare_and_upload_data_endpoint(
     Endpoint pour préparer les données et les téléverser sur S3.
 
     Args:
-        csv_file (UploadFile): Fichier CSV téléversé par l'utilisateur.
-        request_user (User): Utilisateur authentifié.
+        csv_file: Fichier CSV téléversé par l'utilisateur.
+        request_user: Utilisateur authentifié.
 
     Returns:
-        dict[str, str]: Liens S3 des ensembles de données (train, val, test).
+        Liens S3 des ensembles de données (train, val, test).
     """
-    # Vérifier que le fichier est un CSV
+    # Garantir que csv_file.filename n'est pas None
+    assert csv_file.filename is not None, "Le fichier doit avoir un nom."
+
+    # Vérifier que le fichier se termine par .csv
     if not csv_file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Le fichier doit être au format CSV.")
 
     # Sauvegarder temporairement le fichier CSV
-    import os  # pylint: disable=import-outside-toplevel
-
     temp_file_path = os.path.join(AppSettings.LOG_DIR, csv_file.filename)
-    with open(temp_file_path, "wb") as buffer:
-        buffer.write(await csv_file.read())
+    try:
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(await csv_file.read())
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'écriture du fichier temporaire : {str(e)}",
+        ) from e
 
     try:
         # Préparer les données et les téléverser sur S3
         result = await data_cleaning.prepare_and_upload_data(temp_file_path)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la préparation des données : {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la préparation des données : {str(e)}",
+        ) from e
     finally:
         # Supprimer le fichier temporaire
-        import os
-
-        os.remove(temp_file_path)
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)

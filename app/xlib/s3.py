@@ -12,7 +12,7 @@ from AppMain.settings import AppSettings
 # Configure the Boto3 client with your MinIO endpoint, access key, and secret key
 s3 = boto3.client(
     "s3",
-    endpoint_url=AppSettings.AWS_ENDPOINT,
+    # endpoint_url=AppSettings.AWS_ENDPOINT,
     aws_access_key_id=AppSettings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=AppSettings.AWS_ACCESS_KEY_SECRET,
     region_name=AppSettings.AWS_REGION,  # Required but not used with MinIO
