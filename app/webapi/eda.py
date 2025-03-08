@@ -27,14 +27,26 @@ router = APIRouter()
 logger = logging.getLogger("app")
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/upload-file/", status_code=status.HTTP_201_CREATED)
 async def perform_eda_endpoint(
     csv_file: UploadFile = File(...),
-    request_user: User = Depends(user_auth.require([RoleEnum.INST])),
-    batch_size: int = Query(100, description="Taille du lot pour le traitement des requêtes IP"),
-    skip_ip_check: bool = Query(False, description="Ignorer la vérification des pays par IP (plus rapide)"),
+    request_user: User = Depends(user_auth.require([RoleEnum.ADMIN])),
 ) -> dict[str, str]:
+    """
+    Endpoint pour effectuer une analyse exploratoire des données (EDA) à partir d'un fichier CSV.
+
+    Args:
+        csv_file (UploadFile): Fichier CSV téléversé par l'utilisateur.
+        request_user (User): Utilisateur authentifié avec le rôle ADMIN.
+
+    Returns:
+        dict[str, str]: Dictionnaire contenant les graphiques encodés en base64.
+
+    Raises:
+        HTTPException: Si une erreur survient lors de la lecture du fichier ou du traitement des données.
+    """
     try:
+        # Lire le contenu du fichier CSV
         contents = await csv_file.read()
     except Exception as e:
         logger.error("Erreur lors de la lecture du fichier: %s", str(e))
@@ -44,7 +56,8 @@ async def perform_eda_endpoint(
         ) from e
 
     try:
-        return eda.perform_eda(contents, batch_size=batch_size, skip_ip_check=skip_ip_check)
+        # Effectuer l'analyse exploratoire des données
+        return eda.perform_eda(contents)
     except HTTPException:
         # Les exceptions FastAPI générées par perform_eda sont simplement propagées
         raise

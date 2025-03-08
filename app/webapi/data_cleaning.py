@@ -25,10 +25,10 @@ from AppMain.settings import AppSettings
 router = APIRouter()
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/upload-file/", status_code=status.HTTP_201_CREATED)
 async def prepare_and_upload_data_endpoint(
     csv_file: UploadFile = File(...),
-    request_user: User = Depends(user_auth.require([RoleEnum.INST])),
+    request_user: User = Depends(user_auth.require([RoleEnum.ADMIN])),
 ) -> dict[str, str]:
     """
     Endpoint pour préparer les données et les téléverser sur S3.

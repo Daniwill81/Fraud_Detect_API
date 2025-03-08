@@ -1,75 +1,15 @@
 import base64
 import logging
 import typing
-from functools import lru_cache
 from io import BytesIO, StringIO
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import requests
 import seaborn as sns
 from fastapi import HTTPException, status
 
-from AppMain.settings import AppSettings
-
 # Configuration du logger
 logger = logging.getLogger(__name__)
-
-
-# Cache pour stocker les résultats des requêtes d'IP
-@lru_cache(maxsize=1000)
-def get_country_from_ip(ip: str) -> str:
-    """
-    Fonction pour obtenir le pays à partir d'une adresse IP avec mise en cache.
-
-    Args:
-        ip (str): L'adresse IP à vérifier.
-
-    Returns:
-        str: Le code pays ou "Unknown" en cas d'erreur.
-    """
-    if not ip or pd.isna(ip):
-        return "Unknown"
-
-    try:
-        response = requests.get(f"{AppSettings.IP_INFO_URL}{ip}/", timeout=5)
-        response.raise_for_status()  # Vérifie si la requête a réussi
-        data: dict[str, str] = response.json()  # Typage explicite du dictionnaire
-        return data.get("country", "Unknown")
-    except requests.exceptions.RequestException as e:
-        logger.warning("Erreur lors de la récupération des informations d'IP %s: %s", ip, e)
-        return "Unknown"
-    except ValueError as e:
-        logger.warning("Erreur de format JSON pour l'IP %s: %s", ip, e)
-        return "Unknown"
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Erreur inattendue pour l'IP %s: %s", ip, e)
-        return "Unknown"
-
-
-def process_ip_countries_in_batches(df: pd.DataFrame, batch_size: int = 100) -> pd.Series:
-    """
-    Traite les adresses IP par lots pour éviter de surcharger l'API.
-
-    Args:
-        df (pd.DataFrame): DataFrame contenant une colonne 'IP Address'.
-        batch_size (int): Taille du lot d'adresses IP à traiter à la fois.
-
-    Returns:
-        pd.Series: Série contenant les pays correspondant aux adresses IP.
-    """
-    results = pd.Series(index=df.index, dtype="object")  # Typage explicite de la série
-
-    # Traiter les adresses IP par lots
-    for i in range(0, len(df), batch_size):
-        batch = df.iloc[i : i + batch_size]
-        logger.info("Traitement du lot %d/%d", i // batch_size + 1, (len(df) + batch_size - 1) // batch_size)
-
-        # Appliquer la fonction de recherche de pays sur chaque IP du lot
-        for idx, ip in zip(batch.index, batch["IP Address"]):
-            results[idx] = get_country_from_ip(ip)
-
-    return results
 
 
 def load_data(df_or_file: typing.Union[bytes, pd.DataFrame]) -> pd.DataFrame:
@@ -102,13 +42,12 @@ def load_data(df_or_file: typing.Union[bytes, pd.DataFrame]) -> pd.DataFrame:
         ) from exc
 
 
-def generate_plots(df_analysis: pd.DataFrame, skip_ip_check: bool) -> dict[str, str]:
+def generate_plots(df_analysis: pd.DataFrame) -> dict[str, str]:
     """
     Génère les graphiques pour l'analyse exploratoire des données.
 
     Args:
         df_analysis (pd.DataFrame): DataFrame contenant les données analysées.
-        skip_ip_check (bool): Indique si la vérification des pays par IP a été ignorée.
 
     Returns:
         Dict[str, str]: Dictionnaire contenant les graphiques encodés en base64.
@@ -132,11 +71,11 @@ def generate_plots(df_analysis: pd.DataFrame, skip_ip_check: bool) -> dict[str, 
         plt.close()
 
         # Matrice de corrélation
-        numeric_cols = ["Transaction Amount", "Customer Age", "IP Country Code", "Address_Match", "Is Fraudulent"]
+        numeric_cols = ["Transaction Amount", "Customer Age", "Address_Match", "Is Fraudulent"]
         corr_matrix = df_analysis[numeric_cols].corr()
         plt.figure(figsize=(12, 10))
         sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
-        plt.title("Matrice de corrélation (incluant Address_Match et IP Country)")
+        plt.title("Matrice de corrélation (incluant Address_Match)")
         results["correlation_matrix"] = plot_to_base64(plt)
         plt.close()
 
@@ -163,30 +102,6 @@ def generate_plots(df_analysis: pd.DataFrame, skip_ip_check: bool) -> dict[str, 
         results["fraud_by_address_match"] = plot_to_base64(plt)
         plt.close()
 
-        # Nombre de transactions frauduleuses par pays (IP Country)
-        if not skip_ip_check:
-            top_countries = df_analysis["IP Country Original"].value_counts().head(10).index.tolist()
-            top_countries_df = df_analysis[df_analysis["IP Country Original"].isin(top_countries)].copy()
-
-            plt.figure(figsize=(12, 6))
-            sns.countplot(x="IP Country Original", hue="Is Fraudulent", data=top_countries_df, palette="Set2")
-            plt.title("Nombre de transactions frauduleuses par pays (Top 10 pays)")
-            plt.xticks(rotation=45)
-            results["fraud_by_ip_country"] = plot_to_base64(plt)
-            plt.close()
-
-            # Taux de fraude par pays
-            fraud_by_country = (
-                df_analysis.groupby("IP Country Original")["Is Fraudulent"].mean().sort_values(ascending=False).head(10)
-            )
-            plt.figure(figsize=(12, 6))
-            fraud_by_country.plot(kind="bar", color="red")
-            plt.title("Taux de fraude par pays (Top 10)")
-            plt.ylabel("Taux de fraude")
-            plt.xlabel("Pays")
-            plt.xticks(rotation=45)
-            results["fraud_rate_by_country"] = plot_to_base64(plt)
-            plt.close()
     except Exception as exc:
         logger.error("Erreur lors de la génération des graphiques: %s", str(exc))
         raise HTTPException(
@@ -197,17 +112,13 @@ def generate_plots(df_analysis: pd.DataFrame, skip_ip_check: bool) -> dict[str, 
     return results
 
 
-def perform_eda(
-    df_or_file: typing.Union[bytes, pd.DataFrame], batch_size: int = 100, skip_ip_check: bool = False
-) -> dict[str, str]:
+def perform_eda(df_or_file: typing.Union[bytes, pd.DataFrame]) -> dict[str, str]:
     """
     Effectue l'analyse exploratoire des données (EDA) et retourne les graphiques sous forme d'images encodées en base64.
     Accepte soit un DataFrame, soit un fichier CSV.
 
     Args:
         df_or_file: DataFrame pandas ou contenu de fichier CSV.
-        batch_size (int): Taille du lot pour le traitement des requêtes IP.
-        skip_ip_check (bool): Ignorer la vérification des pays par IP pour accélérer le traitement.
 
     Returns:
         Dict[str, str]: Dictionnaire contenant les graphiques encodés en base64.
@@ -217,7 +128,6 @@ def perform_eda(
 
     # Vérifier les colonnes requises
     required_columns = [
-        "IP Address",
         "Transaction Amount",
         "Customer Age",
         "Shipping Address",
@@ -238,25 +148,11 @@ def perform_eda(
     # Créer une copie pour éviter de modifier le DataFrame original
     df_analysis = df.copy()
 
-    # Extraire le pays à partir des adresses IP (par lots ou ignorer)
-    if skip_ip_check:
-        logger.info("Vérification des pays par IP ignorée")
-        df_analysis["IP Country"] = "Unknown"
-        df_analysis["IP Country Original"] = "Unknown"
-    else:
-        logger.info("Extraction des pays à partir des adresses IP...")
-        df_analysis["IP Country"] = process_ip_countries_in_batches(df_analysis, batch_size)
-        df_analysis["IP Country Original"] = df_analysis["IP Country"]
-
     # Créer une nouvelle colonne pour vérifier si l'adresse de livraison correspond à l'adresse de facturation
     df_analysis["Address_Match"] = (df_analysis["Shipping Address"] == df_analysis["Billing Address"]).astype(int)
 
-    # Encoder la colonne 'IP Country' en variables catégorielles
-    ip_country_codes = df_analysis["IP Country"].astype("category").cat.codes
-    df_analysis["IP Country Code"] = ip_country_codes
-
     # Générer les graphiques
-    return generate_plots(df_analysis, skip_ip_check)
+    return generate_plots(df_analysis)
 
 
 def plot_to_base64(plt: typing.Any) -> str:
