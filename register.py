@@ -22,7 +22,7 @@ async def register() -> None:
     """Initialize the database with default data."""
     await initialize_beanie()
 
-    with open("metadata.yml", "r", encoding="utf-8") as stream:
+    with open("metadata.yaml", "r", encoding="utf-8") as stream:
         metadata = yaml.safe_load(stream)
 
     await register_superusers(metadata["superusers"])
