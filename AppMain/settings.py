@@ -69,6 +69,13 @@ class _Settings(pydantic_settings.BaseSettings):
     AWS_S3_BUCKET: str = "e-fraud-demo-bucket-1"
     AWS_USE_SSL: bool = True
 
+    # SageMaker endpoints
+    SAGEMAKER_STANDARD_ENDPOINT: str = "https://your-standard-sagemaker-endpoint.amazonaws.com"
+    SAGEMAKER_CKKS_ENDPOINT: str = "https://your-ckks-sagemaker-endpoint.amazonaws.com"
+
+    # Model settings
+    FRAUD_THRESHOLD: float = 0.5  # Threshold to determine if transaction is fraudulent
+
     # Get conuntry from IP
     IP_INFO_URL: str
 
