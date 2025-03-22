@@ -1,15 +1,20 @@
-from pydantic import BaseModel
+from sap.fastapi.serializers import ObjectSerializer, WriteObjectSerializer
 
-class TransactionRequest(BaseModel):
-    data: List[float]
+from app.models import Transactions
+
+
+class WriteTransactionSerializer(WriteObjectSerializer[Transactions]):
+    data: list[float]
     encrypt: bool = False  # Whether to use encryption
     institution: str  # Name of the financial institution
 
-class TransactionResponse(BaseModel):
+
+class TransactionSerializer(ObjectSerializer[Transactions]):
     prediction: float
     confidence: float
     is_fraud: bool
 
-class TransactionCountResponse(BaseModel):
+
+class TransactionCountSerializer(ObjectSerializer[Transactions]):
     fraudulent: int
     non_fraudulent: int

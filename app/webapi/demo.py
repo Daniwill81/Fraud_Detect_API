@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Depends
-from app.schemas.transaction_schemas import TransactionRequest, TransactionResponse, TransactionCountResponse
-from app.controllers.transaction_controller import (
-    test_without_encryption,
-    test_with_encryption,
-    run_demo,
-    get_transaction_counts
-)
-from typing import Dict
+from fastapi import APIRouter, Depends, status
 
-@router.post("/demo", response_model=TransactionResponse)
-async def endpoint_demo(transaction: TransactionRequest):
+from app.controllers.transactions import run_demo
+from app.serializers.core.transactions import TransactionSerializer, WriteTransactionSerializer
+
+router = APIRouter()
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def demo(serializer_write: WriteTransactionSerializer) -> TransactionSerializer:
     """
     Demo endpoint that can use either model based on the 'encrypt' flag.
     """
-    return await run_demo(transaction)
+    return await run_demo(serializer_write)

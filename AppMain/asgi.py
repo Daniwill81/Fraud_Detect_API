@@ -100,15 +100,19 @@ async def update_uvicorn_logger() -> None:
 
 @app.get("/doc")
 async def api_doc_redirect(request: Request) -> Response:
-    """Home page."""
+    """Redirect to API doc page."""
     return RedirectResponse("/api/doc")
+
 
 # Root endpoint
 @app.get("/")
 async def root():
+    """Home page."""
     return {"message": "Welcome to the Fraud Detection API"}
+
 
 # Health check endpoint
 @app.get("/health")
 async def health_check():
+    """Check api health status."""
     return {"status": "healthy"}

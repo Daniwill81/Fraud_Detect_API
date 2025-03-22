@@ -1,7 +1,9 @@
-from pydantic import BaseModel
+from sap.fastapi.serializers import ObjectSerializer
+
+from app.models import Metrics
 
 
-class MetricsResponse(BaseModel):
+class MetricsSerializer(ObjectSerializer[Metrics]):
     accuracy: float
     precision: float
     recall: float
