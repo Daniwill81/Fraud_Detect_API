@@ -1,3 +1,0 @@
-Transaction Amount
-Customer Age
-Address_Match

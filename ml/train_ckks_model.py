@@ -1,35 +1,105 @@
 import argparse
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Désactive CUDA
-import typing
-
-import boto3
 import joblib
 import numpy as np
 import pandas as pd
-import sagemaker
+import tenseal as ts
 from imblearn.over_sampling import SMOTE
 from keras.src import Sequential, callbacks, metrics, optimizers, regularizers
 from keras.src.layers import Dense, Dropout
 from keras.src.layers.rnn.lstm import LSTM
-from sagemaker.tensorflow import TensorFlow
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from app.xlib import encryption
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable CUDA
+
+
+class HomomorphicEncryptionService:
+    """
+    Homomorphic encryption service using TenSEAL with CKKS.
+    Allows operations on encrypted data.
+    """
+
+    def __init__(
+        self,
+        scheme: str = "CKKS",
+        poly_modulus_degree: int = 8192,
+        coeff_mod_bit_sizes: list[int] = None,
+        security_level: int = 128,
+        key_dir: str = "crypto_keys",
+    ):
+        """
+        Initialize homomorphic encryption service.
+
+        Args:
+            scheme: Encryption scheme (CKKS or BFV)
+            poly_modulus_degree: Modular polynomial degree
+            coeff_mod_bit_sizes: Bit sizes for modular coefficients
+            security_level: Desired security level
+            key_dir: Directory to store keys
+        """
+        self.key_dir = key_dir
+        os.makedirs(key_dir, exist_ok=True)
+
+        # Create the context
+        if coeff_mod_bit_sizes is None:
+            coeff_mod_bit_sizes = [60, 40, 40, 60]
+
+        self.context = ts.Context(
+            ts.SCHEME_TYPE.CKKS, poly_modulus_degree=poly_modulus_degree, coeff_mod_bit_sizes=coeff_mod_bit_sizes
+        )
+        self.context.global_scale = 2**40
+        self.context.generate_galois_keys()
+
+        # Generate or load keys
+        self._generate_keys()
+
+    def _generate_keys(self):
+        """Generate and save public and private keys."""
+        # Save secret key
+        secret_key = self.context.secret_key()
+        with open(f"{self.key_dir}/secret.key", "wb") as f:
+            f.write(secret_key.save())
+
+        # Make context public for key distribution
+        self.context.make_context_public()
+        context_bytes = self.context.save()
+        with open(f"{self.key_dir}/public.key", "wb") as f:
+            f.write(context_bytes)
+
+    def encrypt(self, data):
+        """
+        Encrypt data using CKKS.
+
+        Args:
+            data: Data to encrypt (float or list of floats)
+        """
+        if not isinstance(data, list):
+            data = [float(data)]
+        return ts.ckks_tensor(self.context, data)
+
+    def decrypt(self, encrypted_data):
+        """
+        Decrypt CKKS encrypted data.
+
+        Args:
+            encrypted_data: Encrypted data
+        """
+        result = encrypted_data
+        return result[0] if len(result) == 1 else result
 
 
 def load_data(data_path):
     """
-    Load and preprocess the fraud detection dataset with CKKS encryption simulation.
+    Load and preprocess the fraud detection dataset.
     Handles class imbalance using SMOTE.
 
     Args:
         data_path: Path to the CSV data file
 
     Returns:
-        Processed features and target variables with encryption simulation and balanced classes
+        Processed features and target variables with balanced classes
     """
     # Load data
     df = pd.read_csv(data_path)
@@ -77,44 +147,36 @@ def load_data(data_path):
     # Check resampled distribution
     print(f"Class distribution after balancing: {pd.Series(y_train_resampled).value_counts(normalize=True) * 100}")
 
-    # Save CKKS encryption for inference
-    joblib.dump(ckks, "model_ckks/ckks_encryption.pkl")
-
-    return X_train_resampled, X_test, y_train_resampled, y_test, features, ckks
+    return X_train_resampled, X_test, y_train_resampled, y_test, features
 
 
 def build_encrypted_compatible_model(input_shape, lstm_units=64) -> Sequential:
     """
-    Build an LSTM model that can work with encrypted data.
-    The model structure is similar to the standard model,
-    but with adjustments to handle encrypted data characteristics.
+    Build an LSTM model compatible with encrypted data.
 
     Args:
         input_shape: Shape of input features
         lstm_units: Number of LSTM units
 
     Returns:
-        Compiled LSTM model compatible with encrypted data
+        Compiled LSTM model
     """
     # Reshape for LSTM (samples, timesteps, features)
     input_shape = (1, input_shape[0])
 
     model = Sequential(
         [
-            # Similar architecture but with modified hyperparameters
-            # for encrypted data compatibility
             LSTM(lstm_units, input_shape=input_shape, return_sequences=True),
-            Dropout(0.3),  # Higher dropout for better generalization with encrypted data
+            Dropout(0.3),
             LSTM(lstm_units // 2),
             Dropout(0.3),
-            # More regularization for encrypted data
             Dense(16, activation="relu", kernel_regularizer=regularizers.L2(0.01)),
             Dense(1, activation="sigmoid"),
         ]
     )
 
     model.compile(
-        optimizer=optimizers.Adam(0.0005),  # Lower learning rate for stability
+        optimizer=optimizers.Adam(0.0005),
         loss="binary_crossentropy",
         metrics=[
             "accuracy",
@@ -135,32 +197,28 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequent
         X_train, y_train: Training data
         X_test, y_test: Test data
         features: List of feature names
-        ckks: CKKS simulator instance
     """
-    # For training, we'll use the raw data, but during inference we'll use encrypted data
-    # This simulates training on trusted data but deploying for encrypted inference
-
     # Reshape data for LSTM
     X_train_reshaped = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
     X_test_reshaped = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
 
-    # Build model adjusted for encrypted data
+    # Build model
     model = build_encrypted_compatible_model((X_train.shape[1],))
 
-    # Train model with more epochs for better convergence
-    model.fit(
+    # Train model
+    history = model.fit(
         X_train_reshaped,
         y_train,
         validation_data=(X_test_reshaped, y_test),
-        epochs=15,  # More epochs for encrypted-compatible model
-        batch_size=64,  # Larger batch size for stability
+        epochs=15,
+        batch_size=64,
         callbacks=[
             callbacks.EarlyStopping(patience=5, restore_best_weights=True),
             callbacks.ReduceLROnPlateau(factor=0.5, patience=3),
         ],
     )
 
-    # Test model accuracy
+    # Evaluate model
     results = model.evaluate(X_test_reshaped, y_test)
     print(f"Test Loss: {results[0]:.4f}")
     print(f"Test Accuracy: {results[1]:.4f}")
@@ -178,24 +236,9 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequent
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
 
-    # Also test with simulated encrypted data
-    # This is just for verification during development
-    encrypted_samples = []
-    for i in range(min(10, len(X_test))):
-        # Encrypt sample
-        enc_sample = encryption.encrypt_data(X_test[i])
-        # Decrypt for model (in production, this would happen inside the secure environment)
-        dec_sample = encryption.decrypt_data(enc_sample)
-        encrypted_samples.append(dec_sample)
-
-    encrypted_samples = np.array(encrypted_samples).reshape(-1, 1, X_test.shape[1])
-    enc_results = model.evaluate(encrypted_samples, y_test[: len(encrypted_samples)])
-    print(f"Encrypted Test Loss: {enc_results[0]:.4f}")
-    print(f"Encrypted Test Accuracy: {enc_results[1]:.4f}")
-
     # Save model
     os.makedirs("model_ckks", exist_ok=True)
-    model.save("model_ckks/ckks_model")
+    model.save("model_ckks/ckks_model.keras")
 
     # Save feature names
     with open("model_ckks/features.txt", "w") as f:
@@ -204,57 +247,15 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequent
     return model
 
 
-def deploy_to_sagemaker(role, bucket_name, prefix="ckks-balanced-model") -> typing.Any:
-    """
-    Deploy the encrypted-compatible model to SageMaker.
-
-    Args:
-        role: AWS IAM role
-        bucket_name: S3 bucket name
-        prefix: S3 key prefix
-    """
-    # Initialize SageMaker session
-    sagemaker_session = sagemaker.Session()
-
-    # Upload model to S3
-    model_data = sagemaker_session.upload_data(path="model_ckks", bucket=bucket_name, key_prefix=prefix)
-
-    # Create TensorFlow estimator with custom entry point for encrypted inference
-    estimator = TensorFlow(
-        entry_point="encrypted_inference.py",
-        source_dir=".",
-        role=role,
-        instance_count=1,
-        instance_type="ml.m5.large",
-        framework_version="2.10",
-        py_version="py39",
-        model_dir=f"s3://{bucket_name}/{prefix}/model",
-    )
-
-    # Deploy model
-    predictor = estimator.deploy(initial_instance_count=1, instance_type="ml.m5.large")
-
-    print(f"Encrypted model deployed. Endpoint name: {predictor.endpoint_name}")
-
-    return predictor.endpoint_name
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", type=str, required=True, help="Path to the fraud detection dataset")
     parser.add_argument("--role", type=str, required=True, help="AWS IAM role for SageMaker")
-    parser.add_argument("--bucket", type=str, required=True, help="S3 bucket name for storing model artifacts")
-    parser.add_argument("--deploy", action="store_true", help="Whether to deploy model to SageMaker")
 
     args = parser.parse_args()
 
     # Load and process data
-    X_train, X_test, y_train, y_test, features, ckks = load_data(args.data_path)
+    X_train, X_test, y_train, y_test, features = load_data(args.data_path)
 
     # Train the model
-    model = train_encrypted_model(X_train, y_train, X_test, y_test, features, ckks)
-
-    # Deploy if requested
-    if args.deploy:
-        endpoint_name = deploy_to_sagemaker(args.role, args.bucket)
-        print(f"Model deployed to endpoint: {endpoint_name}")
+    model = train_encrypted_model(X_train, y_train, X_test, y_test, features)

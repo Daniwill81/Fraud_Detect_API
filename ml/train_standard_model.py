@@ -1,19 +1,15 @@
 import argparse
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Désactive CUDA
-import typing
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable CUDA
 
-import boto3
 import joblib
 import numpy as np
 import pandas as pd
-import sagemaker
 from imblearn.over_sampling import SMOTE
 from keras.src import Sequential, callbacks, metrics, optimizers
 from keras.src.layers import Dense, Dropout
 from keras.src.layers.rnn.lstm import LSTM
-from sagemaker.tensorflow import TensorFlow
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -29,7 +25,7 @@ def load_data(data_path):
     Returns:
         Processed features and target variables with balanced classes
     """
-    # Load data from S3
+    # Load data
     df = pd.read_csv(data_path)
 
     # Clean and prepare data
@@ -39,7 +35,7 @@ def load_data(data_path):
     # Add feature for address match
     df["Address_Match"] = (df["Shipping Address"] == df["Billing Address"]).astype(int)
 
-    # Extract more features for better model performance
+    # Extract more features
     if "Transaction Time" in df.columns:
         df["Transaction Time"] = pd.to_datetime(df["Transaction Time"])
         df["Hour"] = df["Transaction Time"].dt.hour
@@ -135,7 +131,7 @@ def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     model = build_lstm_model((X_train.shape[1],))
 
     # Train model
-    model.fit(
+    history = model.fit(
         X_train_reshaped,
         y_train,
         validation_data=(X_test_reshaped, y_test),
@@ -167,7 +163,7 @@ def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
 
     # Save model with .keras extension
     os.makedirs("model", exist_ok=True)
-    model.save("model/balanced_model.keras")
+    model.save("model/standard_model.keras")
 
     # Save feature names
     with open("model/features.txt", "w") as f:
@@ -176,48 +172,10 @@ def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     return model
 
 
-def deploy_to_sagemaker(role, bucket_name, model_path="model", prefix="balanced-model") -> typing.Any:
-    """
-    Deploy the model to SageMaker.
-
-    Args:
-        role: AWS IAM role
-        bucket_name: S3 bucket name
-        model_path: Local path to the saved model
-        prefix: S3 key prefix
-    """
-    # Initialize SageMaker session
-    sagemaker_session = sagemaker.Session()
-
-    # Upload model to S3
-    model_artifacts = sagemaker_session.upload_data(path=model_path, bucket=bucket_name, key_prefix=f"{prefix}/model")
-
-    # Create TensorFlow estimator with model data
-    estimator = TensorFlow(
-        entry_point="inference.py",
-        source_dir=".",
-        role=role,
-        instance_count=1,
-        instance_type="ml.m5.large",
-        framework_version="2.10",
-        py_version="py39",
-        model_uri=model_artifacts,  # Specify the S3 path of model artifacts
-    )
-
-    # Deploy model
-    predictor = estimator.deploy(initial_instance_count=1, instance_type="ml.m5.large")
-
-    print(f"Model deployed. Endpoint name: {predictor.endpoint_name}")
-
-    return predictor.endpoint_name
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", type=str, required=True, help="Path to the fraud detection dataset")
     parser.add_argument("--role", type=str, required=True, help="AWS IAM role for SageMaker")
-    parser.add_argument("--bucket", type=str, required=True, help="S3 bucket name for storing model artifacts")
-    parser.add_argument("--deploy", action="store_true", help="Whether to deploy model to SageMaker")
 
     args = parser.parse_args()
 
@@ -226,8 +184,3 @@ if __name__ == "__main__":
 
     # Train the model
     model = train_model(X_train, y_train, X_test, y_test, features)
-
-    # Deploy if requested
-    if args.deploy:
-        endpoint_name = deploy_to_sagemaker(args.role, args.bucket)
-        print(f"Model deployed to endpoint: {endpoint_name}")
