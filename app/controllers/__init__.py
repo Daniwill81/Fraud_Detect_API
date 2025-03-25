@@ -1,11 +1,10 @@
 """
-Campaign Serializer.
+Controllers.
 
-Serializer campaign wide objects.
+Controllers training objects.
 """
 
 from . import data_cleaning, metrics, transactions
-
 
 __all__ = [
     "data_cleaning",

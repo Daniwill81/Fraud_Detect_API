@@ -1,12 +1,13 @@
 import json
 import logging
 import os
+import typing
 
 import joblib
 import numpy as np
 from tensorflow.python.keras import models
 
-from utils.encryption import decrypt_data, encrypt_data
+from app.xlib.encryption import decrypt_data
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +47,7 @@ def model_fn(model_dir):
     return model
 
 
-def input_fn(request_body, request_content_type):
+def input_fn(request_body, request_content_type) -> typing.Any:
     """
     Parse and preprocess encrypted input data.
 
@@ -82,7 +83,7 @@ def input_fn(request_body, request_content_type):
         raise ValueError(f"Unsupported content type: {request_content_type}")
 
 
-def predict_fn(input_data, model):
+def predict_fn(input_data, model) -> dict[str, float]:
     """
     Generate predictions using the model on encrypted/decrypted data.
 
@@ -112,7 +113,7 @@ def predict_fn(input_data, model):
         raise
 
 
-def output_fn(prediction, accept):
+def output_fn(prediction, accept) -> str:
     """
     Format the prediction output.
 

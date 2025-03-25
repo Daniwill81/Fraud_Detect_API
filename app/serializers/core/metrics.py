@@ -4,6 +4,7 @@ from app.models import Metrics
 
 
 class MetricsSerializer(ObjectSerializer[Metrics]):
+    id: str
     accuracy: float
     precision: float
     recall: float
@@ -11,5 +12,5 @@ class MetricsSerializer(ObjectSerializer[Metrics]):
     auc: float
     false_positive_rate: float
     false_negative_rate: float
-    model_type: str
+    ckkc_or_standard: str
     timestamp: str

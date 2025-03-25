@@ -3,9 +3,8 @@ import os
 
 import joblib
 import numpy as np
-from tensorflow.python.keras import models
-
-# from keras.src import models
+import tensorflow as tf
+from tensorflow.keras import models
 
 # Global variables for the model and related components
 model = None
@@ -26,8 +25,8 @@ def model_fn(model_dir):
     """
     global model, scaler, feature_names
 
-    # Load TensorFlow model
-    model = models.load_model(os.path.join(model_dir, "standard_model"))
+    # Load TensorFlow model with the correct file extension
+    model = models.load_model(os.path.join(model_dir, "balanced_model.keras"))
 
     # Load scaler
     scaler = joblib.load(os.path.join(model_dir, "scaler.pkl"))
@@ -57,10 +56,16 @@ def input_fn(request_body, request_content_type):
         data = input_data.get("data", [])
 
         # Ensure data matches expected feature count
+        if data is None or feature_names is None:
+            raise ValueError("Input data or feature names cannot be None")
+
         if len(data) != len(feature_names):
             raise ValueError(f"Expected {len(feature_names)} features but got {len(data)}")
 
-        return np.array(data)
+        # Scale the input data using the loaded scaler
+        scaled_data = scaler.transform(np.array(data).reshape(1, -1))
+
+        return scaled_data
     else:
         raise ValueError(f"Unsupported content type: {request_content_type}")
 

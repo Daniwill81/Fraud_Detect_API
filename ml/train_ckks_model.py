@@ -1,6 +1,9 @@
 import argparse
 import os
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Désactive CUDA
+import typing
+
 import boto3
 import joblib
 import numpy as np
@@ -14,7 +17,7 @@ from sagemaker.tensorflow import TensorFlow
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from utils.encryption import decrypt_data, encrypt_data
+from app.xlib import encryption
 
 
 def load_data(data_path):
@@ -74,13 +77,13 @@ def load_data(data_path):
     # Check resampled distribution
     print(f"Class distribution after balancing: {pd.Series(y_train_resampled).value_counts(normalize=True) * 100}")
 
-    # Save CKKS simulator for inference
-    joblib.dump(ckks, "model_ckks/ckks_simulator.pkl")
+    # Save CKKS encryption for inference
+    joblib.dump(ckks, "model_ckks/ckks_encryption.pkl")
 
     return X_train_resampled, X_test, y_train_resampled, y_test, features, ckks
 
 
-def build_encrypted_compatible_model(input_shape, lstm_units=64):
+def build_encrypted_compatible_model(input_shape, lstm_units=64) -> Sequential:
     """
     Build an LSTM model that can work with encrypted data.
     The model structure is similar to the standard model,
@@ -124,7 +127,7 @@ def build_encrypted_compatible_model(input_shape, lstm_units=64):
     return model
 
 
-def train_encrypted_model(X_train, y_train, X_test, y_test, features, ckks):
+def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     """
     Train the LSTM model with encrypted data simulation.
 
@@ -180,9 +183,9 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features, ckks):
     encrypted_samples = []
     for i in range(min(10, len(X_test))):
         # Encrypt sample
-        enc_sample = encrypt_data(X_test[i])
+        enc_sample = encryption.encrypt_data(X_test[i])
         # Decrypt for model (in production, this would happen inside the secure environment)
-        dec_sample = decrypt_data(enc_sample)
+        dec_sample = encryption.decrypt_data(enc_sample)
         encrypted_samples.append(dec_sample)
 
     encrypted_samples = np.array(encrypted_samples).reshape(-1, 1, X_test.shape[1])
@@ -201,7 +204,7 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features, ckks):
     return model
 
 
-def deploy_to_sagemaker(role, bucket_name, prefix="ckks-balanced-model"):
+def deploy_to_sagemaker(role, bucket_name, prefix="ckks-balanced-model") -> typing.Any:
     """
     Deploy the encrypted-compatible model to SageMaker.
 

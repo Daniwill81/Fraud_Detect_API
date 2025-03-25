@@ -12,7 +12,7 @@ class Metrics(Document):
     auc: float
     false_positive_rate: float
     false_negative_rate: float
-    model_type: str  # "standard" or "ckks"
+    ckks_or_standard: str  # "standard" or "ckks"
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     class Settings:

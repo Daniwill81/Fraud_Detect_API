@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from app.controllers.metrics import get_all_metrics, get_latest_metrics_comparison, get_metrics_by_model_type
+from app.controllers.metrics import get_all_metrics, get_latest_metrics_comparison, get_metrics_by_ckks_or_standard
 from app.serializers.core.metrics import MetricsSerializer
 
 router = APIRouter()
@@ -19,7 +19,7 @@ async def standard_metrics() -> list[MetricsSerializer]:
     """
     Get metrics only for the standard model.
     """
-    return await get_metrics_by_model_type("standard")
+    return await get_metrics_by_ckks_or_standard("standard")
 
 
 @router.get("/ckks/", status_code=status.HTTP_200_OK)
@@ -27,7 +27,7 @@ async def ckks_metrics() -> list[MetricsSerializer]:
     """
     Get metrics only for the CKKS model.
     """
-    return await get_metrics_by_model_type("ckks")
+    return await get_metrics_by_ckks_or_standard("ckks")
 
 
 @router.get("/compare/", status_code=status.HTTP_200_OK)

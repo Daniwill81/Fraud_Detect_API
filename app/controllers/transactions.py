@@ -4,8 +4,8 @@ from app.models import Transactions
 from app.serializers.core.transactions import TransactionSerializer, WriteTransactionSerializer
 from app.services.metrics import update_hyperparameters, update_metrics
 from app.services.sagemaker import predict_ckks, predict_standard
+from app.xlib.encryption import encrypt_data
 from AppMain.settings import AppSettings
-from utils.encryption import encrypt_data
 
 
 async def test_without_encryption(transaction: WriteTransactionSerializer) -> TransactionSerializer:
@@ -24,7 +24,7 @@ async def test_without_encryption(transaction: WriteTransactionSerializer) -> Tr
             confidence=result["confidence"],
             institution=transaction.institution,
             is_fraud=is_fraud,
-            model_type="standard",
+            ckks_or_standard="standard",
         )
         await transaction_db.insert()
 
@@ -57,7 +57,7 @@ async def test_with_encryption(transaction: WriteTransactionSerializer) -> Trans
             confidence=result["confidence"],
             institution=transaction.institution,
             is_fraud=is_fraud,
-            model_type="ckks",
+            ckks_or_standard="ckks",
         )
         await transaction_db.insert()
 

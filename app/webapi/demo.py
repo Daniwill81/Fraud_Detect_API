@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
 from app.controllers.transactions import run_demo
 from app.serializers.core.transactions import TransactionSerializer, WriteTransactionSerializer

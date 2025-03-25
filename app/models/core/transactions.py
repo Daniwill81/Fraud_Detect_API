@@ -11,7 +11,7 @@ class Transactions(Document):
     confidence: float
     institution: str
     is_fraud: bool
-    model_type: str  # "standard" or "ckks"
+    ckks_or_standard: str  # "standard" or "ckks"
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     class Settings:

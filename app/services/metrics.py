@@ -8,16 +8,16 @@ from app.models import Hyperparameters, Metrics, Transactions
 from AppMain.settings import AppSettings
 
 
-async def update_metrics(transactions: Transactions, model_type: str) -> None:
+async def update_metrics(transactions: Transactions, ckks_or_standard: str) -> None:
     """
     Update metrics after a transaction is processed.
 
     Args:
         transaction: The transaction object
-        model_type: Type of model used ("standard" or "ckks")
+        ckks_or_standard: Type of model used ("standard" or "ckks")
     """
     # Fetch all transactions for this model type
-    transactions = await Transactions.find(Transactions.model_type == model_type).to_list()
+    transactions = await Transactions.find(Transactions.ckks_or_standard == ckks_or_standard).to_list()
 
     # Skip if not enough transactions
     if len(transactions) < 5:
@@ -60,7 +60,7 @@ async def update_metrics(transactions: Transactions, model_type: str) -> None:
             auc=float(auc),
             false_positive_rate=float(false_positive_rate),
             false_negative_rate=float(false_negative_rate),
-            model_type=model_type,
+            ckks_or_standard=ckks_or_standard,
         )
         await metrics.insert()
     except Exception as e:
@@ -76,10 +76,10 @@ async def update_hyperparameters(result: dict[str, Any]) -> None:
         result: Model prediction result
     """
     # Fetch current hyperparameters
-    hyperparams = await Hyperparameters.find_one(Hyperparameters.model_type == "ckks")
+    hyperparams = await Hyperparameters.find_one(Hyperparameters.ckks_or_standard == "ckks")
     if not hyperparams:
         # Initialize with default values if not exists
-        hyperparams = Hyperparameters(learning_rate=0.001, batch_size=32, epochs=10, model_type="ckks")
+        hyperparams = Hyperparameters(learning_rate=0.001, batch_size=32, epochs=10, ckks_or_standard="ckks")
 
     # Update hyperparameters based on model confidence
     if result["confidence"] < 0.7:

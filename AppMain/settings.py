@@ -76,9 +76,6 @@ class _Settings(pydantic_settings.BaseSettings):
     # Model settings
     FRAUD_THRESHOLD: float = 0.5  # Threshold to determine if transaction is fraudulent
 
-    # Get conuntry from IP
-    IP_INFO_URL: str
-
     @property
     def is_prod(self) -> bool:
         """Return True if production environment."""

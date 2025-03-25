@@ -1,6 +1,9 @@
 import argparse
 import os
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Désactive CUDA
+import typing
+
 import boto3
 import joblib
 import numpy as np
@@ -75,7 +78,7 @@ def load_data(data_path):
     return X_train_resampled, X_test, y_train_resampled, y_test, features
 
 
-def build_lstm_model(input_shape, lstm_units=64):
+def build_lstm_model(input_shape, lstm_units=64) -> Sequential:
     """
     Build an LSTM model for fraud detection.
 
@@ -115,7 +118,7 @@ def build_lstm_model(input_shape, lstm_units=64):
     return model
 
 
-def train_model(X_train, y_train, X_test, y_test, features):
+def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     """
     Train the LSTM model.
 
@@ -162,9 +165,9 @@ def train_model(X_train, y_train, X_test, y_test, features):
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
 
-    # Save model
+    # Save model with .keras extension
     os.makedirs("model", exist_ok=True)
-    model.save("model/balanced_model")
+    model.save("model/balanced_model.keras")
 
     # Save feature names
     with open("model/features.txt", "w") as f:
@@ -173,22 +176,23 @@ def train_model(X_train, y_train, X_test, y_test, features):
     return model
 
 
-def deploy_to_sagemaker(role, bucket_name, prefix="balanced-model"):
+def deploy_to_sagemaker(role, bucket_name, model_path="model", prefix="balanced-model") -> typing.Any:
     """
     Deploy the model to SageMaker.
 
     Args:
         role: AWS IAM role
         bucket_name: S3 bucket name
+        model_path: Local path to the saved model
         prefix: S3 key prefix
     """
     # Initialize SageMaker session
     sagemaker_session = sagemaker.Session()
 
     # Upload model to S3
-    model_data = sagemaker_session.upload_data(path="model", bucket=bucket_name, key_prefix=prefix)
+    model_artifacts = sagemaker_session.upload_data(path=model_path, bucket=bucket_name, key_prefix=f"{prefix}/model")
 
-    # Create TensorFlow estimator
+    # Create TensorFlow estimator with model data
     estimator = TensorFlow(
         entry_point="inference.py",
         source_dir=".",
@@ -197,7 +201,7 @@ def deploy_to_sagemaker(role, bucket_name, prefix="balanced-model"):
         instance_type="ml.m5.large",
         framework_version="2.10",
         py_version="py39",
-        model_dir=f"s3://{bucket_name}/{prefix}/model",
+        model_uri=model_artifacts,  # Specify the S3 path of model artifacts
     )
 
     # Deploy model
