@@ -1,3 +1,4 @@
+# train_ckks_model file
 import argparse
 import os
 
@@ -23,11 +24,11 @@ class HomomorphicEncryptionService:
 
     def __init__(
         self,
-        scheme: str = "CKKS",
-        poly_modulus_degree: int = 8192,
-        coeff_mod_bit_sizes: list[int] = None,
-        security_level: int = 128,
-        key_dir: str = "crypto_keys",
+        scheme=ts.SCHEME_TYPE.CKKS,
+        poly_modulus_degree=8192,
+        coeff_mod_bit_sizes=None,
+        encryption_type=ts.ENCRYPTION_TYPE.SYMMETRIC,
+        key_dir="crypto_keys",
     ):
         """
         Initialize homomorphic encryption service.
@@ -36,7 +37,7 @@ class HomomorphicEncryptionService:
             scheme: Encryption scheme (CKKS or BFV)
             poly_modulus_degree: Modular polynomial degree
             coeff_mod_bit_sizes: Bit sizes for modular coefficients
-            security_level: Desired security level
+            encryption_type: Type of encryption (SYMMETRIC or ASYMMETRIC)
             key_dir: Directory to store keys
         """
         self.key_dir = key_dir
@@ -47,10 +48,14 @@ class HomomorphicEncryptionService:
             coeff_mod_bit_sizes = [60, 40, 40, 60]
 
         self.context = ts.Context(
-            ts.SCHEME_TYPE.CKKS, poly_modulus_degree=poly_modulus_degree, coeff_mod_bit_sizes=coeff_mod_bit_sizes
+            scheme=scheme,
+            poly_modulus_degree=poly_modulus_degree,
+            coeff_mod_bit_sizes=coeff_mod_bit_sizes,
+            encryption_type=encryption_type,
         )
         self.context.global_scale = 2**40
         self.context.generate_galois_keys()
+        self.context.generate_relin_keys()
 
         # Generate or load keys
         self._generate_keys()
@@ -60,18 +65,23 @@ class HomomorphicEncryptionService:
         # Create the key directory if it doesn't exist
         if not os.path.exists(self.key_dir):
             os.makedirs(self.key_dir)
-            
-        # Save secret key
-        secret_key = self.context.secret_key()
-        with open(os.path.join(self.key_dir, "secret.key"), "wb") as f:
-            f.write(secret_key.save())
 
-        # Make context public for key distribution
-        self.context.make_context_public()
-        context_bytes = self.context.save()
-        with open(os.path.join(self.key_dir, "public.key"), "wb") as f:
-            f.write(context_bytes)
-            
+        # Save all keys in one file (private context)
+        private_context_data = self.context.serialize(
+            save_public_key=True, save_secret_key=True, save_galois_keys=True, save_relin_keys=True
+        )
+
+        with open(os.path.join(self.key_dir, "private_context.bin"), "wb") as f:
+            f.write(private_context_data)
+
+        # Save public context (without secret key)
+        public_context_data = self.context.serialize(
+            save_public_key=True, save_secret_key=False, save_galois_keys=True, save_relin_keys=True
+        )
+
+        with open(os.path.join(self.key_dir, "public_context.bin"), "wb") as f:
+            f.write(public_context_data)
+
         # Print confirmation
         print(f"Cryptographic keys generated and saved to {self.key_dir}")
 
@@ -84,7 +94,7 @@ class HomomorphicEncryptionService:
         """
         if not isinstance(data, list):
             data = [float(data)]
-        return ts.ckks_tensor(self.context, data)
+        return ts.ckks_vector(self.context, data)
 
     def decrypt(self, encrypted_data):
         """
@@ -93,8 +103,48 @@ class HomomorphicEncryptionService:
         Args:
             encrypted_data: Encrypted data
         """
-        result = encrypted_data
+        result = encrypted_data.decrypt()
         return result[0] if len(result) == 1 else result
+
+    @classmethod
+    def load_private_context(cls, key_dir="crypto_keys"):
+        """
+        Load a private context with all keys from a file.
+
+        Args:
+            key_dir: Directory where keys are stored
+
+        Returns:
+            An instance of HomomorphicEncryptionService with loaded context
+        """
+        instance = cls.__new__(cls)
+        instance.key_dir = key_dir
+
+        with open(os.path.join(key_dir, "private_context.bin"), "rb") as f:
+            context_data = f.read()
+
+        instance.context = ts.Context.load(context_data)
+        return instance
+
+    @classmethod
+    def load_public_context(cls, key_dir="crypto_keys"):
+        """
+        Load a public context (without secret key) from a file.
+
+        Args:
+            key_dir: Directory where keys are stored
+
+        Returns:
+            An instance of HomomorphicEncryptionService with loaded context
+        """
+        instance = cls.__new__(cls)
+        instance.key_dir = key_dir
+
+        with open(os.path.join(key_dir, "public_context.bin"), "rb") as f:
+            context_data = f.read()
+
+        instance.context = ts.Context.load(context_data)
+        return instance
 
 
 def load_data(data_path):
@@ -199,20 +249,42 @@ def build_encrypted_compatible_model(input_shape, lstm_units=64) -> Sequential:
 def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     """
     Train the LSTM model with encrypted data simulation.
-
-    Args:
-        X_train, y_train: Training data
-        X_test, y_test: Test data
-        features: List of feature names
     """
+    # Initialize the encryption service
+    he_service = HomomorphicEncryptionService()
+
     # Reshape data for LSTM
     X_train_reshaped = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
     X_test_reshaped = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
 
+    # Encrypt training data (batches)
+    print("Encrypting training data samples...")
+    encrypted_X_train = []
+    for i in range(min(100, len(X_train_reshaped))):  # Encrypt first 100 samples
+        encrypted_sample = []
+        for feature in X_train_reshaped[i][0]:
+            encrypted_sample.append(he_service.encrypt(feature))
+        encrypted_X_train.append(encrypted_sample)
+
+    print(f"Encrypted {len(encrypted_X_train)} training samples")
+
+    # Instead of saving the entire service, just save the path to the keys
+    # Create a minimal object that can be pickled
+    service_info = {
+        "key_dir": he_service.key_dir,
+        "scheme": ts.SCHEME_TYPE.CKKS,
+        "poly_modulus_degree": 8192,
+        "coeff_mod_bit_sizes": [60, 40, 40, 60],
+        "encryption_type": ts.ENCRYPTION_TYPE.SYMMETRIC,
+    }
+    joblib.dump(service_info, "model_ckks/encryption_service_info.pkl")
+
+    # Rest of your training code...
     # Build model
     model = build_encrypted_compatible_model((X_train.shape[1],))
 
-    # Train model
+    # Train model (using unencrypted data for training as homomorphic operations are limited)
+    print("Training model with regular data...")
     history = model.fit(
         X_train_reshaped,
         y_train,
@@ -225,7 +297,33 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequent
         ],
     )
 
-    # Evaluate model
+    # Test model on encrypted data
+    print("Testing model on encrypted data...")
+    # Encrypt a small subset of test data for demonstration
+    encrypted_test_samples = min(10, len(X_test_reshaped))
+    encrypted_results = []
+
+    for i in range(encrypted_test_samples):
+        # Encrypt sample
+        encrypted_sample = []
+        for feature in X_test_reshaped[i][0]:
+            encrypted_sample.append(he_service.encrypt(feature))
+
+        # For demonstration, we'll decrypt before prediction
+        # In a real scenario, we'd perform homomorphic operations
+        decrypted_sample = np.array([[he_service.decrypt(enc_feat) for enc_feat in encrypted_sample]])
+        decrypted_sample = np.reshape(decrypted_sample, (1, 1, len(decrypted_sample[0])))
+
+        # Make prediction
+        pred = model.predict(decrypted_sample)[0][0]
+        encrypted_results.append((pred, y_test.iloc[i]))
+
+    print(f"Encrypted test results (first {encrypted_test_samples} samples):")
+    for i, (pred, actual) in enumerate(encrypted_results):
+        print(f"Sample {i+1}: Predicted {pred:.4f}, Actual {actual}")
+
+    # Standard evaluation
+    print("Evaluating model on standard test data...")
     results = model.evaluate(X_test_reshaped, y_test)
     print(f"Test Loss: {results[0]:.4f}")
     print(f"Test Accuracy: {results[1]:.4f}")
@@ -252,6 +350,47 @@ def train_encrypted_model(X_train, y_train, X_test, y_test, features) -> Sequent
         f.write("\n".join(features))
 
     return model
+
+
+def encrypt_predict(model, X, he_service=None):
+    """
+    Encrypt data, make prediction, and decrypt result.
+    """
+    # Load encryption service if not provided
+    if he_service is None:
+        service_info = joblib.load("model_ckks/encryption_service_info.pkl")
+        he_service = HomomorphicEncryptionService(
+            scheme=service_info["scheme"],
+            poly_modulus_degree=service_info["poly_modulus_degree"],
+            coeff_mod_bit_sizes=service_info["coeff_mod_bit_sizes"],
+            encryption_type=service_info["encryption_type"],
+            key_dir=service_info["key_dir"],
+        )
+
+    # Reshape input
+    if len(X.shape) == 1:
+        X = np.reshape(X, (1, 1, X.shape[0]))
+    elif len(X.shape) == 2:
+        X = np.reshape(X, (X.shape[0], 1, X.shape[1]))
+
+    # Encrypt input
+    encrypted_X = []
+    for i in range(X.shape[0]):
+        encrypted_sample = []
+        for feature in X[i][0]:
+            encrypted_sample.append(he_service.encrypt(feature))
+        encrypted_X.append(encrypted_sample)
+
+    # For demonstration, decrypt before prediction
+    # In a real-world scenario, we would perform homomorphic operations
+    results = []
+    for sample in encrypted_X:
+        decrypted_sample = np.array([[he_service.decrypt(enc_feat) for enc_feat in sample]])
+        decrypted_sample = np.reshape(decrypted_sample, (1, 1, len(decrypted_sample[0])))
+        pred = model.predict(decrypted_sample)[0][0]
+        results.append(pred)
+
+    return np.array(results)
 
 
 if __name__ == "__main__":

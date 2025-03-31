@@ -1,17 +1,18 @@
+# Modified train_standard_model.py - Add this as a new file
 import argparse
 import os
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable CUDA
 
 import joblib
 import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
-from keras.src import Sequential, callbacks, metrics, optimizers
+from keras.src import Sequential, callbacks, metrics, optimizers, regularizers
 from keras.src.layers import Dense, Dropout
 from keras.src.layers.rnn.lstm import LSTM
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable CUDA
 
 
 def load_data(data_path):
@@ -58,8 +59,8 @@ def load_data(data_path):
     X_scaled = scaler.fit_transform(X)
 
     # Save scaler for inference
-    os.makedirs("model", exist_ok=True)
-    joblib.dump(scaler, "model/scaler.pkl")
+    os.makedirs("model_standard", exist_ok=True)
+    joblib.dump(scaler, "model_standard/scaler.pkl")
 
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42, stratify=y)
@@ -74,7 +75,7 @@ def load_data(data_path):
     return X_train_resampled, X_test, y_train_resampled, y_test, features
 
 
-def build_lstm_model(input_shape, lstm_units=64) -> Sequential:
+def build_model(input_shape, lstm_units=64) -> Sequential:
     """
     Build an LSTM model for fraud detection.
 
@@ -91,17 +92,16 @@ def build_lstm_model(input_shape, lstm_units=64) -> Sequential:
     model = Sequential(
         [
             LSTM(lstm_units, input_shape=input_shape, return_sequences=True),
-            Dropout(0.2),
+            Dropout(0.3),
             LSTM(lstm_units // 2),
-            Dropout(0.2),
-            Dense(16, activation="relu"),
+            Dropout(0.3),
+            Dense(16, activation="relu", kernel_regularizer=regularizers.L2(0.01)),
             Dense(1, activation="sigmoid"),
         ]
     )
 
-    # Use class weights for additional balance during training
     model.compile(
-        optimizer=optimizers.Adam(0.001),
+        optimizer=optimizers.Adam(0.0005),
         loss="binary_crossentropy",
         metrics=[
             "accuracy",
@@ -116,7 +116,7 @@ def build_lstm_model(input_shape, lstm_units=64) -> Sequential:
 
 def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     """
-    Train the LSTM model.
+    Train the standard LSTM model.
 
     Args:
         X_train, y_train: Training data
@@ -128,18 +128,18 @@ def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     X_test_reshaped = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
 
     # Build model
-    model = build_lstm_model((X_train.shape[1],))
+    model = build_model((X_train.shape[1],))
 
     # Train model
     history = model.fit(
         X_train_reshaped,
         y_train,
         validation_data=(X_test_reshaped, y_test),
-        epochs=10,
-        batch_size=32,
+        epochs=15,
+        batch_size=64,
         callbacks=[
-            callbacks.EarlyStopping(patience=3, restore_best_weights=True),
-            callbacks.ReduceLROnPlateau(factor=0.5, patience=2),
+            callbacks.EarlyStopping(patience=5, restore_best_weights=True),
+            callbacks.ReduceLROnPlateau(factor=0.5, patience=3),
         ],
     )
 
@@ -161,12 +161,12 @@ def train_model(X_train, y_train, X_test, y_test, features) -> Sequential:
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
 
-    # Save model with .keras extension
-    os.makedirs("model", exist_ok=True)
-    model.save("model/standard_model.keras")
+    # Save model
+    os.makedirs("model_standard", exist_ok=True)
+    model.save("model_standard/standard_model.keras")
 
     # Save feature names
-    with open("model/features.txt", "w") as f:
+    with open("model_standard/features.txt", "w") as f:
         f.write("\n".join(features))
 
     return model
