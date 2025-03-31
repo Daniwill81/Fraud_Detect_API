@@ -57,16 +57,23 @@ class HomomorphicEncryptionService:
 
     def _generate_keys(self):
         """Generate and save public and private keys."""
+        # Create the key directory if it doesn't exist
+        if not os.path.exists(self.key_dir):
+            os.makedirs(self.key_dir)
+            
         # Save secret key
         secret_key = self.context.secret_key()
-        with open(f"{self.key_dir}/secret.key", "wb") as f:
+        with open(os.path.join(self.key_dir, "secret.key"), "wb") as f:
             f.write(secret_key.save())
 
         # Make context public for key distribution
         self.context.make_context_public()
         context_bytes = self.context.save()
-        with open(f"{self.key_dir}/public.key", "wb") as f:
+        with open(os.path.join(self.key_dir, "public.key"), "wb") as f:
             f.write(context_bytes)
+            
+        # Print confirmation
+        print(f"Cryptographic keys generated and saved to {self.key_dir}")
 
     def encrypt(self, data):
         """
